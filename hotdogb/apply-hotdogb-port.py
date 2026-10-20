@@ -57,6 +57,17 @@ EDITS = {
         # (MMU 16K, PSCI, GIC + timer IRQ); keep the result on screen 2 min.
         ('\t/* No payload: probe the internal UFS while the MMU is still off. */\n\tstage = "ufs";\n'
          '\ttest_ufs();\n\tcon_skip();\n',
+         '#ifdef HOTDOGB_SMP\n'
+         '\t/* smp test: PSCI CPU_ON for MPIDR 0x100-0x700, MMU off (no cache coherency issues). */\n'
+         '\tcon_hex2("PSCI", "ver=", smc(PSCI_VERSION, 0, 0, 0), "on=", smc(PSCI_FEATURES, PSCI_CPU_ON, 0, 0));\n'
+         '\ttest_smp();\n'
+         '\tcon_hex2("GICR1", "grp0=", sec_probe[0], "grp1=", sec_probe[1]);\n'
+         '\tcon_hex2("GICR1", "prio=", sec_probe[2], "ok=", sec_probe[3]);\n'
+         '\tcon_skip();\n'
+         '\tcon_str("SMP", "done, reset in ~2 min");\n'
+         '\tdelay_ms(120000);\n'
+         '\treset(20);\n'
+         '#endif\n'
          '#ifndef HOTDOGB_TEST2\n'
          '\t/* No payload: probe the internal UFS while the MMU is still off. */\n\tstage = "ufs";\n'
          '\ttest_ufs();\n\tcon_skip();\n'),

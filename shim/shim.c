@@ -406,6 +406,17 @@ void shim_main(uint64_t dtb)
 	con_str("LOADER", why);
 	con_skip();
 
+#ifdef HOTDOGB_SMP
+	/* smp test: PSCI CPU_ON for MPIDR 0x100-0x700, MMU off (no cache coherency issues). */
+	con_hex2("PSCI", "ver=", smc(PSCI_VERSION, 0, 0, 0), "on=", smc(PSCI_FEATURES, PSCI_CPU_ON, 0, 0));
+	test_smp();
+	con_hex2("GICR1", "grp0=", sec_probe[0], "grp1=", sec_probe[1]);
+	con_hex2("GICR1", "prio=", sec_probe[2], "ok=", sec_probe[3]);
+	con_skip();
+	con_str("SMP", "done, reset in ~2 min");
+	delay_ms(120000);
+	reset(20);
+#endif
 #ifndef HOTDOGB_TEST2
 	/* No payload: probe the internal UFS while the MMU is still off. */
 	stage = "ufs";
