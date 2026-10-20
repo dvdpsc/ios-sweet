@@ -6,6 +6,7 @@ this repo in `PORTING_NOTES.md` / `STATUS.md`.
 | File | What |
 | --- | --- |
 | `apply-hotdogb-port.py` | Re-applies the config-only changes (IMEM, watchdog, FB size, CPU clocks) to a fresh ios-sweet checkout. Idempotent. |
+| `mkxnu-boot.sh` | CI kernel + shim + stock boot.img → RAM-bootable XNU image with safe boot-args (no UFS writes). |
 | `pack-boot.py` | Packs a shim `Image` into a boot.img v2 using the header + DTB of the phone's stock `boot.img`. Pure Python. |
 
 ## Shim builds (CI `shim.yml`, or locally)
