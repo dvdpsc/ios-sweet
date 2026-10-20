@@ -53,6 +53,19 @@ EDITS = {
          '\t/* An xnu payload in the ramdisk means: boot it (MMU stays off). */'),
         ('con_str("SHIM", "sweet milestone 4: xnu loader");',
          'con_str("SHIM", "hotdogb: xnu loader / ufs probe");'),
+        # test2 (-DHOTDOGB_TEST2): skip the UFS probe and run sweet's milestone 3
+        # (MMU 16K, PSCI, GIC + timer IRQ); keep the result on screen 2 min.
+        ('\t/* No payload: probe the internal UFS while the MMU is still off. */\n\tstage = "ufs";\n'
+         '\ttest_ufs();\n\tcon_skip();\n',
+         '#ifndef HOTDOGB_TEST2\n'
+         '\t/* No payload: probe the internal UFS while the MMU is still off. */\n\tstage = "ufs";\n'
+         '\ttest_ufs();\n\tcon_skip();\n'),
+        ('\tdelay_ms(180000);\n\treset(20);\n',
+         '\tdelay_ms(180000);\n\treset(20);\n#endif\n'),
+        ('\ttest_gic();\n\n\tstage = "done";\n\treset(40);',
+         '\ttest_gic();\n\n\tstage = "done";\n'
+         '#ifdef HOTDOGB_TEST2\n\tdelay_ms(80000);\t/* time to photograph */\n#endif\n'
+         '\treset(40);'),
     ],
     'shim/build.sh': [
         ('# Build the shim and wrap it in a boot.img v2 that mirrors the stock PixelOS header.',

@@ -406,6 +406,7 @@ void shim_main(uint64_t dtb)
 	con_str("LOADER", why);
 	con_skip();
 
+#ifndef HOTDOGB_TEST2
 	/* No payload: probe the internal UFS while the MMU is still off. */
 	stage = "ufs";
 	test_ufs();
@@ -414,6 +415,7 @@ void shim_main(uint64_t dtb)
 	con_str("UFS", "probe done, reset in ~3 min");
 	delay_ms(180000);
 	reset(20);
+#endif
 
 	stage = "fill off";
 	uint64_t fill_off = ticks_fill(RED);
@@ -454,5 +456,8 @@ void shim_main(uint64_t dtb)
 	test_gic();
 
 	stage = "done";
+#ifdef HOTDOGB_TEST2
+	delay_ms(80000);	/* time to photograph */
+#endif
 	reset(40);
 }
