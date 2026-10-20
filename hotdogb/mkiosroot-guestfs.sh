@@ -57,6 +57,7 @@ printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
 
 # ---- bring-up tweaks (upstream script, path based) ----
 python3 "$repo/tools/sweet-root-tweaks.py" "$stage"
+python3 "$repo/hotdogb/hotdogb-root-tweaks.py" "$stage"
 
 # Linux hfsplus cannot hard-link symlinks: give every multiply-linked symlink its own inode.
 find "$stage" -type l -links +1 -print0 | while IFS= read -r -d '' l; do cp -P "$l" "$l.sw$$" && mv -f "$l.sw$$" "$l"; done
