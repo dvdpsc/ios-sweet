@@ -10,13 +10,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adt  # noqa: E402
 
 # Kernel-managed RAM: above every Qualcomm XPU carve-out (see NOTES.md)
-# hotdogb TODO: still the sweet values. Replace from the 7T live FDT memory
-# node before the first XNU boot (PORTING_NOTES.md, section 2.2).
-PHYS_BASE = 0xb0000000
+# hotdogb live FDT memory node: <0x80000000 0x3bb00000>, <0xc0000000 0xc0000000>,
+# <0x1_80000000 0x1_00000000>: hole at 0xbbb00000-0xc0000000, so sweet's
+# 0xb0000000 base would cross it. Fixed carve-outs all end below 0xace00000.
+PHYS_BASE = 0xc0000000
 MEM_SIZE = 0x4d000000
 # --highmem (phone only): the whole upper DDR bank. The live FDT memory node is
 # <0x80000000 2G>, <0x1_00000000 0xfcc00000>; every fixed reserved-memory
 # carve-out is in the low bank and the dynamic pools are limited below 4G.
+# hotdogb: 0x1_00000000-0x1_fcc00000 lies inside the live 0xc0000000-0x2_80000000
+# RAM run, no reserved-memory above 4G: sweet values kept (up to 6G available).
 HIGH_PHYS_BASE = 0x100000000
 HIGH_MEM_SIZE = 0xfcc00000
 # /arm-io children are relative to this; it must not be 0 (serial_init bails)

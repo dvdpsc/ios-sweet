@@ -73,10 +73,16 @@ EDITS = {
         ("('clock-frequency', u32(2304000000 if core >= 6 else 1804800000)),",
          "# hotdogb SM8150+ (descriptive only): 4x A55 1.785 GHz, 3x gold 2.42 GHz, 1x prime 2.96 GHz\n"
          "            ('clock-frequency', u32(2956800000 if core == 7 else 2419200000 if core >= 4 else 1785600000)),"),
-        ('# Kernel-managed RAM: above every Qualcomm XPU carve-out (see NOTES.md)',
+        ('# Kernel-managed RAM: above every Qualcomm XPU carve-out (see NOTES.md)\nPHYS_BASE = 0xb0000000\n',
          '# Kernel-managed RAM: above every Qualcomm XPU carve-out (see NOTES.md)\n'
-         '# hotdogb TODO: still the sweet values. Replace from the 7T live FDT memory\n'
-         '# node before the first XNU boot (PORTING_NOTES.md, section 2.2).'),
+         '# hotdogb live FDT memory node: <0x80000000 0x3bb00000>, <0xc0000000 0xc0000000>,\n'
+         '# <0x1_80000000 0x1_00000000>: hole at 0xbbb00000-0xc0000000, so sweet\'s\n'
+         '# 0xb0000000 base would cross it. Fixed carve-outs all end below 0xace00000.\n'
+         'PHYS_BASE = 0xc0000000\n'),
+        ('# carve-out is in the low bank and the dynamic pools are limited below 4G.\n',
+         '# carve-out is in the low bank and the dynamic pools are limited below 4G.\n'
+         '# hotdogb: 0x1_00000000-0x1_fcc00000 lies inside the live 0xc0000000-0x2_80000000\n'
+         '# RAM run, no reserved-memory above 4G: sweet values kept (up to 6G available).\n'),
     ],
 }
 
