@@ -341,6 +341,109 @@ static void test_gic(void)
 	isb();
 }
 
+#ifdef HOTDOGB_KEYS
+/*
+ * hotdogb test-keys: read-only SPMI observer reads (as sweet patch 0060), no PMIC writes.
+ * Live DT: arbiter core 0xc440000, obsrvr 0xe600000, cnfg 0xc40a000; power = PM8150 PON
+ * KPDPWR (PPID 0x008, RT_STS 0x0810 bit0, RESIN bit1); vol+ = PM8150 GPIO6 (PPID 0x0c5,
+ * 0xc510 bit0, active low); vol- = PM8150 GPIO7 (PPID 0x0c6, 0xc610 bit0, active low).
+ */
+#define SPMI_CORE	0x0c440000UL
+#define SPMI_OBS	0x0e600000UL
+#define SPMI_CNFG	0x0c40a000UL
+#define NO_APID		0xffffU
+
+static uint32_t spmi_status;
+
+static uint16_t spmi_apid(uint16_t ppid, uint32_t count)
+{
+	uint16_t found = NO_APID;
+	for (uint32_t i = 0; i < count; i++) {
+		uint32_t map = rd32(SPMI_CORE + 0x900 + 4 * i);
+		if (map == 0 || ((map >> 8) & 0xfff) != ppid)
+			continue;
+		if (found == NO_APID || (rd32(SPMI_CNFG + 0x700 + 4 * i) & 7) == 0)
+			found = i;
+	}
+	return found;
+}
+
+static int spmi_read(uint16_t apid, uint16_t addr, uint8_t *out)
+{
+	if (apid == NO_APID)
+		return 0;
+	uintptr_t ch = SPMI_OBS + 0x80UL * apid;
+	__asm__ volatile("dmb oshst" ::: "memory");
+	wr32(ch, (1U << 27) | ((uint32_t)(addr & 0xff) << 4));	/* EXT_READL, 1 byte */
+	__asm__ volatile("dsb osh" ::: "memory");
+	uint64_t end = now() + rsr("cntfrq_el0") / 100;		/* 10 ms */
+	while (now() < end) {
+		spmi_status = rd32(ch + 0x08);
+		if (spmi_status & 1) {
+			if (spmi_status & 0x0e)
+				return 0;
+			*out = rd32(ch + 0x18);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void keys_header(uint32_t ver, uint32_t count, const uint16_t *apid)
+{
+	con_clear(RED);
+	con_str("SHIM", "hotdogb test-keys (read-only SPMI)");
+	con_hex2("ARB", "ver=", ver, "apids=", count);
+	con_hex2("APID", "pon=", apid[0], "gp6=", apid[1]);
+	con_hex2("APID", "gp7=", apid[2], 0, 0);
+	static const uint16_t base[2] = { 0xc500, 0xc600 };
+	for (int g = 0; g < 2; g++) {
+		uint8_t st = 0, mode = 0, en = 0;
+		int a = spmi_read(apid[g + 1], base[g] + 0x05, &st);
+		int b = spmi_read(apid[g + 1], base[g] + 0x40, &mode);
+		int c = spmi_read(apid[g + 1], base[g] + 0x46, &en);
+		con_hex2(g ? "GPIO7" : "GPIO6", "sub/mode=", (a << 31) | (st << 8) | mode,
+			 "en/ok=", (en << 8) | (b << 1) | c);
+	}
+	con_str("KEYS", "press power / vol+ / vol- (2 min)");
+	con_skip();
+}
+
+static void test_keys(void)
+{
+	stage = "keys";
+	uint32_t ver = rd32(SPMI_CORE), count = rd32(SPMI_CORE + 4) & 0x7ff;
+	uint16_t apid[3] = { NO_APID, NO_APID, NO_APID };
+	if (ver >= 0x50000000U && ver < 0x70000000U && count && count <= 512) {
+		apid[0] = spmi_apid(0x008, count);
+		apid[1] = spmi_apid(0x0c5, count);
+		apid[2] = spmi_apid(0x0c6, count);
+	}
+	keys_header(ver, count, apid);
+	uint32_t last = 0xffffffff;
+	int events = 0;
+	uint64_t end = now() + rsr("cntfrq_el0") * 120;
+	while (now() < end) {
+		uint8_t pon = 0, g6 = 0, g7 = 0;
+		int ok = spmi_read(apid[0], 0x0810, &pon) | spmi_read(apid[1], 0xc510, &g6) << 1 |
+			 spmi_read(apid[2], 0xc610, &g7) << 2;
+		/* pressed bits: 1 power, 2 vol+, 4 vol-, 8 resin; ok in bits 8-10 */
+		uint32_t keys = (pon & 1) | (!(g6 & 1) && (ok & 2)) << 1 | (!(g7 & 1) && (ok & 4)) << 2 |
+				((pon >> 1) & 1) << 3 | ok << 8;
+		if (keys != last) {
+			last = keys;
+			if (++events > 18) {
+				keys_header(ver, count, apid);
+				events = 1;
+			}
+			con_hex2("KEY", "pwr/v+/v-/rs=", ((keys & 1) << 12) | ((keys >> 1 & 1) << 8) |
+				 ((keys >> 2 & 1) << 4) | (keys >> 3 & 1), "raw=", (pon << 16) | (g6 << 8) | g7);
+		}
+		delay_ms(20);
+	}
+}
+#endif
+
 /* ---- main ---- */
 
 static void __attribute__((unused)) psci_line(const char *label, uint64_t fn)
@@ -406,6 +509,10 @@ void shim_main(uint64_t dtb)
 	con_str("LOADER", why);
 	con_skip();
 
+#ifdef HOTDOGB_KEYS
+	test_keys();
+	reset(20);
+#endif
 #ifdef HOTDOGB_SMP
 	/* smp test: PSCI CPU_ON for MPIDR 0x100-0x700, MMU off (no cache coherency issues). */
 	con_hex2("PSCI", "ver=", smc(PSCI_VERSION, 0, 0, 0), "on=", smc(PSCI_FEATURES, PSCI_CPU_ON, 0, 0));
