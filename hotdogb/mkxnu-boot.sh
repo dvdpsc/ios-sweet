@@ -16,7 +16,7 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 [ $# -ge 4 ] || { sed -n 2,12p "$0"; exit 1; }
 kernel=$1 shim=$2 stock=$3 out=$4 extra=${5:-}
 
-args="debug=0xc serial=3 cpus=1 keepsyms=1 -enable_kprintf_spam -noprogress wdt=-1"
+args="debug=0xc serial=3 cpus=${CPUS:-1} keepsyms=1 -enable_kprintf_spam -noprogress wdt=-1"
 root=ufsroot0; [ -n "${RAMDISK:-}" ] && root=md0
 log=sweetlog=0; [ "${ALLOW_UFS_WRITES:-}" = 1 ] && log=""   # writes allowed: keep the console log (last 4 MiB of userdata)
 args+=" rd=$root $log sweettouch=0 sweetkeys=0 sweetusb=0 sweetbattery=0"
