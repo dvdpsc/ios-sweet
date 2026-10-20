@@ -1,0 +1,44 @@
+name: shim
+
+# Builds the boot shim for the OnePlus 7T (hotdogb) on a free Linux runner.
+# Output: the raw arm64 Image files only. The bootable boot.img is packed
+# locally with hotdogb/pack-boot.py, because it reuses the header and DTB of
+# the phone's own stock boot.img (private device data, never committed).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, hotdogb]
+    paths:
+      - "shim/**"
+      - ".github/workflows/shim.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu gawk cpio
+
+      - name: Build
+        run: |
+          mkdir -p dist
+          # test1: framebuffer colour test + read-only UFS/GPT probe (no payload)
+          # xnu:   same shim without the colour test, for booting an xnu payload
+          for v in test1:-DHOTDOGB_FBTEST xnu:; do
+            n=${v%%:*}
+            rm -rf shim/out
+            NO_BOOTIMG=1 EXTRA_CFLAGS="${v#*:}" bash shim/build.sh
+            cp shim/out/Image "dist/shim-$n.Image"
+          done
+          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shim-hotdogb
+          path: dist/

@@ -10,6 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adt  # noqa: E402
 
 # Kernel-managed RAM: above every Qualcomm XPU carve-out (see NOTES.md)
+# hotdogb TODO: still the sweet values. Replace from the 7T live FDT memory
+# node before the first XNU boot (PORTING_NOTES.md, section 2.2).
 PHYS_BASE = 0xb0000000
 MEM_SIZE = 0x4d000000
 # --highmem (phone only): the whole upper DDR bank. The live FDT memory node is
@@ -22,7 +24,7 @@ SOC_BASE = 0x01000000
 
 GICD, GICD_SIZE = 0x17a00000, 0x10000
 GICR, GICR_SIZE = 0x17a60000, 0x100000
-FB, FB_SIZE = 0x9c000000, 0x1700000
+FB, FB_SIZE = 0x9c000000, 0x2400000   # hotdogb: sm8150.dtsi cont_splash_region (36 MiB)
 SWEET_ECID = 0x5357454554000001  # 'SWEET' + 1, synthetic
 FB_W, FB_H, FB_STRIDE = 1080, 2400, 1080 * 4
 # Internal UFS host (ufshc@1d84000 "ufs_mem"); QEMU virt has none
@@ -139,7 +141,8 @@ def build(seed=None, qemu=False, highmem=False):
             ('l3-cache-id', u32(0)),     # shared L3
             ('state', cstr('running' if core == 0 else 'stopped')),
             ('timebase-frequency', u32(timebase)),
-            ('clock-frequency', u32(2304000000 if core >= 6 else 1804800000)),
+            # hotdogb SM8150+ (descriptive only): 4x A55 1.785 GHz, 3x gold 2.42 GHz, 1x prime 2.96 GHz
+            ('clock-frequency', u32(2956800000 if core == 7 else 2419200000 if core >= 4 else 1785600000)),
             ('bus-frequency', u32(100000000)),
             ('memory-frequency', u32(1866000000)),
             ('peripheral-frequency', u32(timebase)),

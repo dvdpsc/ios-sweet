@@ -12,9 +12,10 @@
 #include "loader.h"
 #include "ufs.h"
 
-#define IMEM_RESTART_REASON	0x146aa65cUL	/* qcom,msm-imem restart_reason@65c */
+#define IMEM_RESTART_REASON	0x146bf65cUL	/* hotdogb: sm8150.dtsi qcom,msm-imem@146bf000 + restart_reason@65c */
 #define RESTART_BOOTLOADER	0x77665500U
 #define PSHOLD			0x0c264000UL
+#define WDT_BASE		0x17c10000UL	/* sm8150.dtsi qcom,wdt@17c10000; EN is +0x08 (as on the V60) */
 
 #define GICD_BASE		0x17a00000UL
 #define GICR_BASE		0x17a60000UL
@@ -374,10 +375,32 @@ void shim_main(uint64_t dtb)
 {
 	struct mmu_info mi;
 
+	/*
+	 * hotdogb: ABL may leave the apps watchdog armed (the V60 ABL does: reset
+	 * after ~1 min). Disable it first, as Linux does on suspend.
+	 */
+	wr32(WDT_BASE + 0x08, 0);
+	__asm__ volatile("dsb sy" ::: "memory");
+
+#ifdef HOTDOGB_FBTEST
+	/*
+	 * hotdogb test1: does writing the cont_splash framebuffer change what the
+	 * command-mode panel shows? Red, green, blue, 3 s each. If the screen
+	 * never changes, the panel needs an MDP/DSI kick per frame.
+	 */
+	stage = "fbtest";
+	con_clear(RED);
+	delay_ms(3000);
+	con_clear(GREEN);
+	delay_ms(3000);
+	con_clear(BLUE);
+	delay_ms(3000);
+#endif
+
 	/* An xnu payload in the ramdisk means: boot it (MMU stays off). */
 	stage = "loader";
 	con_clear(RED);
-	con_str("SHIM", "sweet milestone 4: xnu loader");
+	con_str("SHIM", "hotdogb: xnu loader / ufs probe");
 	con_skip();
 	const char *why = loader_boot(dtb);
 	con_str("LOADER", why);
