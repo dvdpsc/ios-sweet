@@ -446,6 +446,60 @@ static void test_keys(void)
 
 /* ---- main ---- */
 
+#ifdef HOTDOGB_TOUCH0
+/*
+ * hotdogb touch power probe: READ ONLY. PM8150 LDO17 (touch AVDD, RPMh ldoa17) over the
+ * SPMI observer; TLMM SOUTH pins 54/80 (reset), 55/56 (SDA/SCL qup17), 119 (1.8 V en),
+ * 122 (IRQ); GCC QUP wrapper 2 branch clocks; SE17 (0xc80000) only if they are all on
+ * (reading an unclocked GENI SE can hang the bus).
+ */
+#define TLMM_SOUTH	0x03d00000UL
+#define GCC_BASE	0x00100000UL
+#define SE17_BASE	0x00c80000UL
+
+static void test_touch0(void)
+{
+	stage = "touch0";
+	uint32_t ver = rd32(SPMI_CORE), count = rd32(SPMI_CORE + 4) & 0x7ff;
+	con_clear(RED);
+	con_str("SHIM", "hotdogb touch power probe (read-only)");
+	uint16_t ldo = (ver >= 0x50000000U && count <= 512) ? spmi_apid(0x050, count) : NO_APID;
+	uint8_t t = 0, st = 0, sts = 0, vl = 0, vh = 0, en = 0;
+	int ok = spmi_read(ldo, 0x5004, &t) | spmi_read(ldo, 0x5005, &st) << 1 |
+		 spmi_read(ldo, 0x5008, &sts) << 2 | spmi_read(ldo, 0x5040, &vl) << 3 |
+		 spmi_read(ldo, 0x5041, &vh) << 4 | spmi_read(ldo, 0x5046, &en) << 5;
+	con_hex2("LDO17", "apid=", ldo, "ok=", ok);
+	con_hex2("LDO17", "type/sub=", (t << 8) | st, "sts/en=", (sts << 8) | en);
+	con_hex2("LDO17", "mV=", (vh << 8) | vl, 0, 0);
+	static const int pins[6] = { 54, 80, 55, 56, 119, 122 };
+	for (int i = 0; i < 6; i++) {
+		char l[] = "GPIO000";
+		l[4] = '0' + pins[i] / 100; l[5] = '0' + pins[i] / 10 % 10; l[6] = '0' + pins[i] % 10;
+		con_hex2(l, "cfg=", rd32(TLMM_SOUTH + pins[i] * 0x1000UL), "io=",
+			 rd32(TLMM_SOUTH + pins[i] * 0x1000UL + 4));
+	}
+	con_hex2("GCC", "vote52014=", rd32(GCC_BASE + 0x52014), "vote5200c=", rd32(GCC_BASE + 0x5200c));
+	static const uint32_t cbcr[5] = { 0x1e004, 0x1e008, 0x1e00c, 0x1e010, 0x1e144 };
+	int all_on = 1;
+	for (int i = 0; i < 5; i++) {
+		uint32_t v = rd32(GCC_BASE + cbcr[i]);
+		if (v >> 31)
+			all_on = 0;
+		con_hex2("CBCR", "reg=", cbcr[i], "val=", v);
+	}
+	if (all_on) {
+		stage = "se17";
+		con_hex2("SE17", "fw=", rd32(SE17_BASE + 0x68), "status=", rd32(SE17_BASE + 0x40));
+		con_hex2("SE17", "clksel=", rd32(SE17_BASE + 0x7c), "mclk=", rd32(SE17_BASE + 0x48));
+	} else {
+		con_str("SE17", "clock off: not read");
+	}
+	con_skip();
+	con_str("TOUCH0", "done, reset in ~2 min");
+	delay_ms(120000);
+}
+#endif
+
 static void __attribute__((unused)) psci_line(const char *label, uint64_t fn)
 {
 	con_hex2(label, "feat=", smc(PSCI_FEATURES, fn, 0, 0), 0, 0);
@@ -509,6 +563,10 @@ void shim_main(uint64_t dtb)
 	con_str("LOADER", why);
 	con_skip();
 
+#ifdef HOTDOGB_TOUCH0
+	test_touch0();
+	reset(20);
+#endif
 #ifdef HOTDOGB_KEYS
 	test_keys();
 	reset(20);
