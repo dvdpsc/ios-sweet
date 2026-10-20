@@ -112,6 +112,26 @@ EDITS = {
          '# hotdogb: 0x1_00000000-0x1_fcc00000 lies inside the live 0xc0000000-0x2_80000000\n'
          '# RAM run, no reserved-memory above 4G: sweet values kept (up to 6G available).\n'),
     ],
+    # ---- keys (shim test-keys verified on the phone): vol+ PM8150 GPIO6, vol- PM8150 GPIO7 ----
+    'xnu/patches/0060-sweet-keys-touch-drivers.patch': [
+        ('+++ b/bsd/dev/sweet_keys.c\n@@ -0,0 +1,182 @@', '+++ b/bsd/dev/sweet_keys.c\n@@ -0,0 +1,185 @@'),
+        ('+ * See hw-report.md: volume-up is PM6150L SID 4, NOT PM6150 SID 0.',
+         '+ * hotdogb: vol+ = PM8150 GPIO6, vol- = PM8150 GPIO7 (SID 0), power = PON KPDPWR.'),
+        ('+#define KEYS_GPIO_RT     0xc110u\n', '+#define KEYS_GPIO_RT     0xc510u\n+#define KEYS_GPIO7_RT    0xc610u\n'),
+        ('+static uint16_t keys_pon_apid = KEYS_NO_APID, keys_gpio_apid = KEYS_NO_APID;',
+         '+static uint16_t keys_pon_apid = KEYS_NO_APID, keys_gpio_apid = KEYS_NO_APID, keys_gpio7_apid = KEYS_NO_APID;'),
+        ('+\t\tbool gok = keys_read(keys_gpio_apid, KEYS_GPIO_RT, &gpio);\n+\t\tint now[3] = {!!(pon & 1u), !(gpio & 1u), !!(pon & 2u)};',
+         '+\t\tbool gok = keys_read(keys_gpio_apid, KEYS_GPIO_RT, &gpio);\n'
+         '+\t\tuint8_t g7 = 0; bool g7ok = keys_read(keys_gpio7_apid, KEYS_GPIO7_RT, &g7);\n'
+         '+\t\tint now[3] = {!!(pon & 1u), !(gpio & 1u), !(g7 & 1u)};'),
+        ('+\t\t\tif ((k == 1 ? gok : pok) && now[k] != state[k]) {',
+         '+\t\t\tif ((k == 1 ? gok : k == 2 ? g7ok : pok) && now[k] != state[k]) {'),
+        ('+\tkeys_gpio_apid = keys_find_apid(0x4c1, count);\n',
+         '+\tkeys_gpio_apid = keys_find_apid(0x0c5, count);\n+\tkeys_gpio7_apid = keys_find_apid(0x0c6, count);\n'),
+        ('+\tbool mok = keys_read(keys_gpio_apid, 0xc140, &mode);', '+\tbool mok = keys_read(keys_gpio_apid, 0xc540, &mode);'),
+        ('+\tbool eok = keys_read(keys_gpio_apid, 0xc146, &en);', '+\tbool eok = keys_read(keys_gpio_apid, 0xc546, &en);'),
+        ('+\tbool sok = keys_read(keys_gpio_apid, 0xc105, &subtype);', '+\tbool sok = keys_read(keys_gpio_apid, 0xc505, &subtype);'),
+    ],
 }
 
 
